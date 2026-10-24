@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Case Drill Mobile</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Case Drill">
+<style>
+/* Layout: phone column — address card, fixed-height result slot, 3×4 case board, sticky Next bar; settings and study tucked into drawers. */
+:root {
+  --bg: #eef0f2;
+  --case: #c9cfd6;
+  --case-edge: #a3acb7;
+  --cell: #dde2e7;
+  --label: #fbfbf8;
+  --label-ink: #1c2530;
+  --ink: #1c2530;
+  --muted: #5d6875;
+  --line: #b7c0ca;
+  --accent: #1f4f8c;
+  --accent-ink: #ffffff;
+  --accent-soft: #dbe6f4;
+  --ok: #1d7a46;
+  --ok-soft: #d7efe0;
+  --bad: #b3261e;
+  --bad-soft: #f8dcd9;
+  --panel: #ffffff;
+  --f-display: "Avenir Next Condensed", "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --f-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --wing: 16deg;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14181d; --case: #2b323b; --case-edge: #3c4552; --cell: #20262d; --label: #e9e8e1; --label-ink: #1c2530;
+    --ink: #e6eaef; --muted: #9aa5b2; --line: #3a434e; --accent: #8fb6ec; --accent-ink: #10233d; --accent-soft: #23344b;
+    --ok: #5fcf8e; --ok-soft: #173a27; --bad: #ff8a80; --bad-soft: #43201e; --panel: #1b2027;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14181d; --case: #2b323b; --case-edge: #3c4552; --cell: #20262d; --label: #e9e8e1; --label-ink: #1c2530;
+  --ink: #e6eaef; --muted: #9aa5b2; --line: #3a434e; --accent: #8fb6ec; --accent-ink: #10233d; --accent-soft: #23344b;
+  --ok: #5fcf8e; --ok-soft: #173a27; --bad: #ff8a80; --bad-soft: #43201e; --panel: #1b2027;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.4;
+  padding-left: max(14px, env(safe-area-inset-left, 0px));
+  padding-right: max(14px, env(safe-area-inset-right, 0px));
+  padding-block: 8px calc(70px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+}
+.wrap { max-width: 560px; margin: 0 auto; display: grid; gap: 8px; }
+button { font: inherit; color: inherit; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.top h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 22px; line-height: 1; }
+.stats { display: flex; gap: 14px; font-variant-numeric: tabular-nums; }
+.stat { display: grid; text-align: right; }
+.stat b { font-family: var(--f-display); font-size: 19px; font-weight: 700; line-height: 1; }
+.stat span { font-size: 9.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+
+.prompt { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; }
+.eyebrow { font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.addr { min-height: 48px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 10px; }
+.addr .num { font-family: var(--f-display); font-weight: 700; font-size: 44px; line-height: 1; font-variant-numeric: tabular-nums; }
+.addr .street { font-family: var(--f-display); font-weight: 600; font-size: 26px; line-height: 1.05; text-transform: uppercase; }
+.addr .unit { font-family: var(--f-display); font-weight: 700; font-size: 22px; color: var(--accent); text-transform: uppercase; }
+
+/* fixed-height result slot: no layout shift between asking and answering */
+.fb-line { height: 52px; overflow: hidden; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.verdict { flex: none; font-family: var(--f-display); font-weight: 700; font-size: 17px; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; }
+.verdict.ok { background: var(--ok-soft); color: var(--ok); }
+.verdict.bad { background: var(--bad-soft); color: var(--bad); }
+.ctx { min-width: 0; }
+.ctx b { font-weight: 700; }
+.ctx .mono { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); }
+.hint { color: var(--muted); }
+.fb-zoom { height: 86px; min-width: 0; }
+.rz-empty { height: 100%; border: 1px dashed var(--line); border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 16px; color: var(--muted); font-size: 12.5px; }
+.rowzoom { height: 100%; display: grid; gap: 3px; align-content: start; min-width: 0; }
+.rz-head { height: 15px; display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.rz-head b { color: var(--ink); }
+.rz-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.rz-scroll::-webkit-scrollbar { display: none; }
+.rz-grid { display: grid; }
+.rz-caret { height: 11px; text-align: center; font-size: 10px; color: var(--accent); font-weight: 700; line-height: 1; }
+.rz-cell { height: 34px; border: 1px solid var(--line); border-left-width: 0; background: var(--bg); position: relative;
+  font-family: var(--f-display); font-weight: 700; font-size: 14px; text-align: center; padding-top: 12px; line-height: 1; font-variant-numeric: tabular-nums; }
+.rz-cell:first-child { border-left-width: 1px; }
+.rz-cell small { position: absolute; top: 2px; left: 0; right: 0; font-family: var(--f-mono); font-weight: 400; font-size: 8.5px; color: var(--muted); }
+.rz-cell .u { display: block; font-size: 10px; margin-top: 1px; }
+.rz-cell.hit { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.rz-cell.hit small { color: var(--accent-ink); opacity: .85; }
+.rz-street { height: 18px; font-size: 10px; font-weight: 700; text-transform: uppercase; text-align: center; padding: 2px 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border: 1px solid var(--line); border-top: 0; border-left-width: 0; color: var(--muted); }
+.rz-street.first { border-left-width: 1px; }
+.rz-street.a { background: var(--panel); }
+.rz-street.b { background: var(--bg); }
+.rz-street.hit { color: var(--accent); }
+
+/* board */
+.board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.board.stand { perspective: 900px; perspective-origin: 50% 30%; padding-inline: 3%; padding-block: 6px; gap: 3px; }
+.case { background: var(--case); border: 1px solid var(--case-edge); border-radius: 8px; padding: 4px 4px 5px; display: grid; gap: 4px; align-content: start; transition: transform .4s cubic-bezier(.2,.7,.2,1), filter .4s; }
+.board.stand .case[data-c="1"] { transform-origin: 100% 50%; transform: rotateY(var(--wing)); filter: brightness(.94); }
+.board.stand .case[data-c="3"] { transform-origin: 0% 50%; transform: rotateY(calc(var(--wing) * -1)); filter: brightness(.94); }
+.board.stand .case[data-c="1"].look { transform: rotateY(calc(var(--wing) * .4)); filter: none; }
+.board.stand .case[data-c="3"].look { transform: rotateY(calc(var(--wing) * -.4)); filter: none; }
+.board.stand .case[data-c="2"].away { filter: brightness(.94); }
+.case-head { text-align: center; font-family: var(--f-display); font-weight: 700; font-size: 14px; line-height: 1.2; text-transform: uppercase; letter-spacing: .04em; }
+.tile { display: grid; grid-template-rows: 10px auto; border: 0; padding: 0; background: none; text-align: left; cursor: pointer; border-radius: 5px; }
+.holes { border: 1px solid var(--case-edge); border-bottom: 0; border-radius: 5px 5px 0 0;
+  background: repeating-linear-gradient(90deg, transparent 0 6px, var(--case-edge) 6px 7px), var(--cell); }
+.tile .holes.cells { display: flex; gap: 1px; padding: 2px; background: var(--cell); }
+.tile .holes.cells i { flex: 1 1 0; min-width: 0; background: var(--case-edge); opacity: .45; }
+.tile .holes.cells i.hit { background: var(--accent); opacity: 1; }
+.strip { background: var(--label); color: var(--label-ink); border: 1px solid var(--case-edge); border-radius: 0 0 5px 5px; padding: 3px 5px 4px; min-height: 44px; display: grid; gap: 1px; align-content: start; }
+.strip .rn { display: flex; justify-content: space-between; font-family: var(--f-display); font-weight: 700; font-size: 12.5px; line-height: 1.1; text-transform: uppercase; }
+.strip .rn span { font-family: var(--f-mono); font-weight: 400; font-size: 9.5px; color: #5d6875; }
+.strip .pa { font-family: var(--f-display); font-weight: 600; font-size: 12px; line-height: 1.1; text-transform: uppercase; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.hide-labels .strip .pa, .hide-labels .strip .rn span { visibility: hidden; }
+.tile:active .strip { background: var(--accent-soft); }
+.tile.is-ok .strip, .tile.is-answer .strip { background: var(--ok-soft); color: var(--ok); }
+.tile.is-ok .holes, .tile.is-answer .holes { box-shadow: inset 0 0 0 2px var(--ok); }
+.tile.is-bad .strip { background: var(--bad-soft); color: var(--bad); }
+.tile.is-ok .rn span, .tile.is-answer .rn span, .tile.is-bad .rn span { color: inherit; }
+.tile .bar { height: 3px; margin-top: 2px; background: var(--case-edge); border-radius: 2px; overflow: hidden; }
+.tile .bar i { display: block; height: 100%; width: 0; background: var(--ok); }
+
+/* sticky next bar */
+.nextbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--bg); border-top: 1px solid var(--line);
+  padding: 7px max(14px, env(safe-area-inset-right, 0px)) calc(7px + env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-left, 0px)); }
+.nextbar .inner { max-width: 560px; margin: 0 auto; display: flex; gap: 10px; align-items: center; }
+.next { flex: 1; height: 46px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 17px; }
+.next[disabled] { opacity: .35; }
+.auto { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.auto input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+/* drawers */
+details.drawer { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+details.drawer summary { padding: 12px 14px; font-family: var(--f-display); font-weight: 700; font-size: 17px; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
+.dbody { padding: 0 14px 14px; display: grid; gap: 12px; }
+.set { display: grid; gap: 6px; }
+.set > span { font-size: 12px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 7px 12px; font-size: 13.5px; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { flex: 1; border: 0; background: var(--bg); padding: 9px 6px; font-size: 13.5px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.small { font-size: 12px; color: var(--muted); margin: 0; }
+.link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; font-size: 14px; }
+.confirm { display: flex; gap: 10px; align-items: center; font-size: 14px; flex-wrap: wrap; }
+.confirm .danger { border: 1px solid var(--bad); color: var(--bad); background: none; border-radius: 6px; padding: 5px 12px; }
+.srow { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 6px; }
+.srow h3 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 16px; text-transform: uppercase; }
+.srow h3 small { font-family: var(--f-mono); font-weight: 400; font-size: 11px; color: var(--muted); text-transform: none; margin-left: 6px; }
+.runs { display: flex; flex-wrap: wrap; gap: 5px; }
+.run { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 7px; font-size: 12.5px; }
+.run span { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <h1>Case Drill</h1>
+    <div class="stats" aria-live="polite">
+      <div class="stat"><b id="sCorrect">0/0</b><span>Session</span></div>
+      <div class="stat"><b id="sStreak">0</b><span>Streak</span></div>
+      <div class="stat"><b id="sBest">0</b><span>Best</span></div>
+      <div class="stat"><b id="sKnown">0</b><span>Known</span></div>
+    </div>
+  </header>
+
+  <section class="prompt" aria-label="Current address">
+    <div class="eyebrow" id="eyebrow">Where does this go?</div>
+    <div class="addr" id="addr"></div>
+    <div class="fb-line" id="fbLine" aria-live="polite"></div>
+    <div class="fb-zoom" id="fbZoom"></div>
+  </section>
+
+  <section class="board" id="board" aria-label="Carrier cases"></section>
+
+  <details class="drawer">
+    <summary>Settings</summary>
+    <div class="dbody">
+      <div class="set"><span>Rows to practice</span><div class="chips" id="chips"></div></div>
+      <div class="set"><span>Row labels</span><div class="seg"><button id="lblOn">Show primary</button><button id="lblOff">Hide</button></div></div>
+      <div class="set"><span>Order</span><div class="seg"><button id="ordSmart">Focus on misses</button><button id="ordRoute">In sequence</button></div></div>
+      <div class="set"><span>View</span><div class="seg"><button id="viewStand">At Case 2</button><button id="viewFlat">Flat</button></div></div>
+      <div class="set"><span>Case rows</span><div class="seg"><button id="mapAcross">Across cases</button><button id="mapDown">Down each case</button></div>
+        <p class="small">Across cases: Loc 1 is Case 1 Row 1, Loc 2 is Case 2 Row 1, Loc 3 is Case 3 Row 1, Loc 4 wraps to Case 1 Row 2.</p></div>
+      <p class="small">Progress is saved on this phone. Misses come back sooner; three right in a row counts as known.</p>
+      <div id="resetWrap"></div>
+    </div>
+  </details>
+
+  <details class="drawer">
+    <summary>Study the rows</summary>
+    <div class="dbody" id="study"></div>
+  </details>
+</div>
+
+<div class="nextbar">
+  <div class="inner">
+    <label class="auto"><input type="checkbox" id="autoNext"> Auto-next when right</label>
+    <button class="next" id="nextBtn" disabled>Next</button>
+  </div>
+</div>
+
+<script>
+const DATA = [[1,1,"16 Tomlinson Mill Rd"],[2,1,"11 Penny Ln"],[3,1,"10 Penny Ln"],[4,1,"9 Penny Ln"],[5,1,"8 Penny Ln"],[6,1,"7 Penny Ln"],[7,1,"6 Penny Ln"],[8,1,"5 Penny Ln"],[9,1,"4 Penny Ln"],[10,1,"3 Penny Ln"],[11,1,"2 Penny Ln"],[12,1,"1 Penny Ln"],[13,1,"13 Tomlinson Mill Rd"],[14,1,"11 Tomlinson Mill Rd Ste 1"],[15,1,"11 Tomlinson Mill Rd Ste 2"],[16,1,"11 Tomlinson Mill Rd"],[17,1,"9 Tomlinson Mill Rd"],[18,1,"7 Tomlinson Mill Rd Ste 1"],[19,1,"7 Tomlinson Mill Rd Ste 2"],[20,1,"7 Tomlinson Mill Rd Ste 3"],[21,1,"7 Tomlinson Mill Rd Ste 4"],[22,1,"7 Tomlinson Mill Rd Ste 5"],[23,1,"5 Tomlinson Mill Rd"],[24,1,"1 Silver Star Trl"],[25,1,"1 Tomlinson Mill Rd"],[26,1,"3 Tomlinson Mill Rd"],[27,1,"7 Pocahontas Trl"],[28,1,"9 Pocahontas Trl"],[29,1,"11 Pocahontas Trl"],[30,1,"13 Pocahontas Trl"],[31,1,"15 Pocahontas Trl"],[32,1,"17 Pocahontas Trl"],[33,1,"19 Pocahontas Trl"],[34,1,"21 Pocahontas Trl"],[35,1,"25 Pocahontas Trl"],[36,1,"27 Pocahontas Trl"],[37,1,"29 Pocahontas Trl"],[38,1,"31 Pocahontas Trl"],[39,1,"33 Pocahontas Trl"],[40,1,"35 Pocahontas Trl"],[41,1,"39 Pocahontas Trl"],[42,1,"36 Pocahontas Trl"],[43,1,"34 Pocahontas Trl"],[44,1,"32 Pocahontas Trl"],[45,2,"30 Pocahontas Trl"],[46,2,"28 Pocahontas Trl"],[47,2,"26 Pocahontas Trl"],[48,2,"24 Pocahontas Trl"],[49,2,"22 Pocahontas Trl"],[50,2,"20 Pocahontas Trl"],[51,2,"18 Pocahontas Trl"],[52,2,"258 Hopewell Rd"],[53,2,"262 Hopewell Rd"],[54,2,"268 Hopewell Rd"],[55,2,"270 Hopewell Rd"],[56,2,"272 Hopewell Rd"],[57,2,"274 Hopewell Rd"],[58,2,"276 Hopewell Rd"],[59,2,"278 Hopewell Rd"],[60,2,"280 Hopewell Rd"],[61,2,"282 Hopewell Rd"],[62,2,"290 Hopewell Rd"],[63,2,"2 Magnolia Ct"],[64,2,"4 Magnolia Ct"],[65,2,"6 Magnolia Ct"],[66,2,"8 Magnolia Ct"],[67,2,"10 Magnolia Ct"],[68,2,"12 Magnolia Ct"],[69,2,"14 Magnolia Ct"],[70,2,"16 Magnolia Ct"],[71,2,"18 Magnolia Ct"],[72,2,"20 Magnolia Ct"],[73,2,"22 Magnolia Ct"],[74,2,"2 Gottliebs Field Rd"],[75,2,"4 Gottliebs Field Rd"],[76,2,"6 Gottliebs Field Rd"],[77,2,"8 Gottliebs Field Rd"],[78,2,"10 Gottliebs Field Rd"],[79,2,"16 Gottliebs Field Rd"],[80,2,"18 Gottliebs Field Rd"],[81,2,"1 Slab Branch Rd"],[82,2,"1 Tyler Ct"],[83,2,"3 Tyler Ct"],[84,2,"5 Tyler Ct"],[85,3,"7 Tyler Ct"],[86,3,"8 Tyler Ct"],[87,3,"6 Tyler Ct"],[88,3,"4 Tyler Ct"],[89,3,"2 Tyler Ct"],[90,3,"7 Slab Branch Rd"],[91,3,"9 Slab Branch Rd"],[92,3,"11 Slab Branch Rd"],[93,3,"15 Slab Branch Rd"],[94,3,"6 Slab Branch Rd"],[95,3,"68 Gottliebs Field Rd"],[96,3,"70 Gottliebs Field Rd"],[97,3,"72 Gottliebs Field Rd"],[98,3,"80 Gottliebs Field Rd"],[99,3,"6 Golden Club Dr"],[100,3,"4 Golden Club Dr"],[101,3,"2 Golden Club Dr"],[102,3,"1 Golden Club Dr"],[103,3,"3 Golden Club Dr"],[104,3,"5 Golden Club Dr"],[105,3,"1 Waterlily Ct"],[106,3,"5 Waterlily Ct"],[107,3,"7 Waterlily Ct"],[108,3,"9 Waterlily Ct"],[109,3,"10 Waterlily Ct"],[110,3,"8 Waterlily Ct"],[111,3,"6 Waterlily Ct"],[112,3,"4 Waterlily Ct"],[113,3,"2 Waterlily Ct"],[114,3,"84 Gottliebs Field Rd"],[115,3,"88 Gottliebs Field Rd"],[116,3,"2 Brookwood Dr"],[117,3,"4 Brookwood Dr"],[118,3,"6 Brookwood Dr"],[119,3,"8 Brookwood Dr"],[120,3,"9 Bradford Ct"],[121,3,"7 Bradford Ct"],[122,3,"5 Bradford Ct"],[123,3,"3 Bradford Ct"],[124,3,"10 Brookwood Dr"],[125,4,"12 Brookwood Dr"],[126,4,"14 Brookwood Dr"],[127,4,"16 Brookwood Dr"],[128,4,"18 Brookwood Dr"],[129,4,"20 Brookwood Dr"],[130,4,"19 Brookwood Dr"],[131,4,"17 Brookwood Dr"],[132,4,"15 Brookwood Dr"],[133,4,"11 Brookwood Dr"],[134,4,"9 Brookwood Dr"],[135,4,"7 Brookwood Dr"],[136,4,"5 Brookwood Dr"],[137,4,"3 Brookwood Dr"],[138,4,"1 Brookwood Dr"],[139,4,"1 Sassafras Way"],[140,4,"3 Sassafras Way"],[141,4,"5 Sassafras Way"],[142,4,"7 Sassafras Way"],[143,4,"2 Sweet Gum Ct"],[144,4,"4 Sweet Gum Ct"],[145,4,"6 Sweet Gum Ct"],[146,4,"8 Sweet Gum Ct"],[147,4,"10 Sweet Gum Ct"],[148,4,"12 Sweet Gum Ct"],[149,4,"14 Sweet Gum Ct"],[150,4,"9 Sweet Gum Ct"],[151,4,"7 Sweet Gum Ct"],[152,4,"5 Sweet Gum Ct"],[153,4,"3 Sweet Gum Ct"],[154,4,"1 Sweet Gum Ct"],[155,4,"2 False Heather Way"],[156,4,"4 False Heather Way"],[157,4,"6 False Heather Way"],[158,4,"7 False Heather Way"],[159,4,"5 False Heather Way"],[160,4,"3 False Heather Way"],[161,4,"1 False Heather Way"],[162,4,"1 Persimmon Ct"],[163,4,"3 Persimmon Ct"],[164,4,"5 Persimmon Ct"],[165,5,"7 Persimmon Ct"],[166,5,"9 Persimmon Ct"],[167,5,"8 Persimmon Ct"],[168,5,"6 Persimmon Ct"],[169,5,"4 Persimmon Ct"],[170,5,"2 Persimmon Ct"],[171,5,"16 Teaberry Dr"],[172,5,"14 Teaberry Dr"],[173,5,"12 Teaberry Dr"],[174,5,"10 Teaberry Dr"],[175,5,"3 Timbre Ct"],[176,5,"5 Timbre Ct"],[177,5,"6 Timbre Ct"],[178,5,"2 Timbre Ct"],[179,5,"6 Teaberry Dr"],[180,5,"4 Teaberry Dr"],[181,5,"2 Teaberry Dr"],[182,5,"1 Teaberry Dr"],[183,5,"3 Teaberry Dr"],[184,5,"5 Teaberry Dr"],[185,5,"1 Leatherleaf Ct"],[186,5,"3 Leatherleaf Ct"],[187,5,"5 Leatherleaf Ct"],[188,5,"6 Leatherleaf Ct"],[189,5,"4 Leatherleaf Ct"],[190,5,"2 Leatherleaf Ct"],[191,5,"6 Sassafras Way"],[192,5,"4 Sassafras Way"],[193,5,"2 Sassafras Way"],[194,5,"2 Briarwood Ct"],[195,5,"4 Briarwood Ct"],[196,5,"5 Briarwood Ct"],[197,5,"3 Briarwood Ct"],[198,5,"1 Briarwood Ct"],[199,5,"34 Bortons Rd"],[200,5,"36 Bortons Rd"],[201,5,"38 Bortons Rd"],[202,5,"40 Bortons Rd"],[203,5,"42 Bortons Rd"],[204,5,"48 Bortons Rd"],[205,6,"50 Bortons Rd"],[206,6,"52 Bortons Rd"],[207,6,"53 Bortons Rd"],[208,6,"2 Milford Dr"],[209,6,"1 Milford Dr"],[210,6,"3 Milford Dr"],[211,6,"47 Bortons Rd"],[212,6,"45 Bortons Rd"],[213,6,"2 Braddocks Mill Ct"],[214,6,"4 Braddocks Mill Ct"],[215,6,"8 Braddocks Mill Ct"],[216,6,"10 Braddocks Mill Ct"],[217,6,"9 Braddocks Mill Ct"],[218,6,"7 Braddocks Mill Ct"],[219,6,"5 Braddocks Mill Ct"],[220,6,"3 Braddocks Mill Ct"],[221,6,"1 Braddocks Mill Ct"],[222,6,"37 Bortons Rd"],[223,6,"35 Bortons Rd"],[224,6,"33 Bortons Rd"],[225,6,"31 Bortons Rd"],[226,6,"29 Bortons Rd"],[227,6,"27 Bortons Rd"],[228,6,"25 Bortons Rd"],[229,6,"23 Bortons Rd"],[230,6,"3 Saw Mill Rd"],[231,6,"5 Saw Mill Rd"],[232,6,"7 Saw Mill Rd"],[233,6,"9 Saw Mill Rd"],[234,6,"11 Saw Mill Rd"],[235,6,"13 Saw Mill Rd"],[236,6,"15 Saw Mill Rd"],[237,6,"17 Saw Mill Rd"],[238,6,"19 Saw Mill Rd"],[239,6,"21 Saw Mill Rd"],[240,6,"23 Saw Mill Rd"],[241,6,"25 Saw Mill Rd"],[242,6,"30 Saw Mill Rd"],[243,6,"22 Saw Mill Rd"],[244,6,"20 Saw Mill Rd"],[245,7,"1 Saw Mill Ct"],[246,7,"4 Saw Mill Ct"],[247,7,"6 Saw Mill Ct"],[248,7,"2 Saw Mill Ct"],[249,7,"18 Saw Mill Rd"],[250,7,"16 Saw Mill Rd"],[251,7,"14 Saw Mill Rd"],[252,7,"12 Saw Mill Rd"],[253,7,"10 Saw Mill Rd"],[254,7,"8 Saw Mill Rd"],[255,7,"14 Tansborough Rd"],[256,7,"16 Tansborough Rd"],[257,7,"18 Tansborough Rd"],[258,7,"20 Tansborough Rd"],[259,7,"22 Tansborough Rd"],[260,7,"24 Tansborough Rd"],[261,7,"17 Oak Rdg"],[262,7,"15 Oak Rdg"],[263,7,"11 Oak Rdg"],[264,7,"8 Green Gln"],[265,7,"10 Green Gln"],[266,7,"14 Green Gln"],[267,7,"3 Crowfoot Rd"],[268,7,"495 Jackson Rd"],[269,7,"13 Lake Dr"],[270,7,"7 Lake Dr"],[271,7,"7 Lake Dr Apt A"],[272,7,"7 Lake Dr Apt B"],[273,7,"17 Tansborough Rd"],[274,7,"19 Tansborough Rd"],[275,7,"6 Saw Mill Rd"],[276,7,"4 Saw Mill Rd"],[277,7,"2 Saw Mill Rd"],[278,7,"181 W Centennial Dr"],[279,7,"179 W Centennial Dr"],[280,7,"177 W Centennial Dr"],[281,7,"175 W Centennial Dr"],[282,7,"173 W Centennial Dr"],[283,7,"171 W Centennial Dr"],[284,7,"169 W Centennial Dr"],[285,7,"167 W Centennial Dr"],[286,7,"165 W Centennial Dr"],[287,7,"163 W Centennial Dr"],[288,7,"161 W Centennial Dr"],[289,8,"159 W Centennial Dr"],[290,8,"155 W Centennial Dr"],[291,8,"151 W Centennial Dr"],[292,8,"149 W Centennial Dr"],[293,8,"147 W Centennial Dr"],[294,8,"143 W Centennial Dr"],[295,8,"141 W Centennial Dr"],[296,8,"139 W Centennial Dr"],[297,8,"135 W Centennial Dr"],[298,8,"133 W Centennial Dr"],[299,8,"131 W Centennial Dr"],[300,8,"129 W Centennial Dr"],[301,8,"127 W Centennial Dr"],[302,8,"125 W Centennial Dr"],[303,8,"123 W Centennial Dr"],[304,8,"121 W Centennial Dr"],[305,8,"119 W Centennial Dr"],[306,8,"115 W Centennial Dr"],[307,8,"113 W Centennial Dr"],[308,8,"111 W Centennial Dr"],[309,8,"109 W Centennial Dr"],[310,8,"107 W Centennial Dr"],[311,8,"105 W Centennial Dr"],[312,8,"103 W Centennial Dr"],[313,8,"101 W Centennial Dr"],[314,8,"15 Pontiac Dr"],[315,8,"12 Pontiac Dr"],[316,8,"13 Pontiac Dr"],[317,8,"11 Pontiac Dr"],[318,8,"9 Pontiac Dr"],[319,8,"10 Pontiac Dr"],[320,8,"7 Pontiac Dr"],[321,8,"8 Pontiac Dr"],[322,8,"5 Pontiac Dr"],[323,8,"6 Pontiac Dr"],[324,8,"3 Pontiac Dr"],[325,8,"4 Pontiac Dr"],[326,8,"2 Pontiac Dr"],[327,8,"1 Scout Dr"],[328,8,"1 Pontiac Dr"],[329,9,"4 Scout Dr"],[330,9,"2 Cedar Falls Dr"],[331,9,"1 Cedar Falls Dr"],[332,9,"3 Cedar Falls Dr"],[333,9,"4 Cedar Falls Dr"],[334,9,"5 Cedar Falls Dr"],[335,9,"7 Cedar Falls Dr"],[336,9,"6 Cedar Falls Dr"],[337,9,"9 Cedar Falls Dr"],[338,9,"8 Cedar Falls Dr"],[339,9,"10 Cedar Falls Dr"],[340,9,"12 Cedar Falls Dr"],[341,9,"2 Shanty Dam Rd"],[342,9,"7 Cloverleaf Ct"],[343,9,"5 Cloverleaf Ct"],[344,9,"3 Cloverleaf Ct"],[345,9,"1 Cloverleaf Ct"],[346,9,"1 Shanty Dam Rd"],[347,9,"21 Pontiac Dr"],[348,9,"23 Pontiac Dr"],[349,9,"22 Pontiac Dr"],[350,9,"25 Pontiac Dr"],[351,9,"24 Pontiac Dr"],[352,9,"26 Pontiac Dr"],[353,9,"27 Pontiac Dr"],[354,9,"29 Pontiac Dr"],[355,9,"28 Pontiac Dr"],[356,9,"30 Pontiac Dr"],[357,9,"31 Pontiac Dr"],[358,9,"32 Pontiac Dr"],[359,9,"33 Pontiac Dr"],[360,9,"34 Pontiac Dr"],[361,9,"36 Pontiac Dr"],[362,9,"37 Pontiac Dr"],[363,9,"38 Pontiac Dr"],[364,9,"40 Pontiac Dr"],[365,9,"41 Pontiac Dr"],[366,9,"42 Pontiac Dr"],[367,9,"43 Pontiac Dr"],[368,9,"47 Watson Way"],[369,10,"49 Watson Way"],[370,10,"51 Watson Way"],[371,10,"50 Watson Way"],[372,10,"53 Watson Way"],[373,10,"54 Watson Way"],[374,10,"60 Watson Way"],[375,10,"58 Watson Way"],[376,10,"56 Watson Way"],[377,10,"5 Shanty Dam Rd"],[378,10,"4 Shanty Dam Rd"],[379,10,"1 Centennial Dam Rd"],[380,10,"104 W Centennial Dr"],[381,10,"106 W Centennial Dr"],[382,10,"108 W Centennial Dr"],[383,10,"110 W Centennial Dr"],[384,10,"112 W Centennial Dr"],[385,10,"114 W Centennial Dr"],[386,10,"116 W Centennial Dr"],[387,10,"118 W Centennial Dr"],[388,10,"120 W Centennial Dr"],[389,10,"124 W Centennial Dr"],[390,10,"126 W Centennial Dr"],[391,10,"128 W Centennial Dr"],[392,10,"130 W Centennial Dr"],[393,10,"132 W Centennial Dr"],[394,10,"134 W Centennial Dr"],[395,10,"136 W Centennial Dr"],[396,10,"138 W Centennial Dr"],[397,10,"140 W Centennial Dr"],[398,10,"142 W Centennial Dr"],[399,10,"144 W Centennial Dr"],[400,10,"146 W Centennial Dr"],[401,10,"148 W Centennial Dr"],[402,10,"150 W Centennial Dr"],[403,10,"97 W Centennial Dr"],[404,10,"95 W Centennial Dr"],[405,10,"93 W Centennial Dr"],[406,10,"1 Piney Run Rd"],[407,10,"3 Piney Run Rd"],[408,11,"7 Piney Run Rd"],[409,11,"6 Piney Run Rd"],[410,11,"13 Piney Run Rd"],[411,11,"14 Piney Run Rd"],[412,11,"15 Piney Run Rd"],[413,11,"17 Piney Run Rd"],[414,11,"16 Piney Run Rd"],[415,11,"10 Piney Run Rd"],[416,11,"2 Piney Run Rd"],[417,11,"59 Spruce Dr"],[418,11,"22 Spruce Dr"],[419,11,"55 Spruce Dr"],[420,11,"18 Spruce Dr"],[421,11,"51 Spruce Dr"],[422,11,"49 Spruce Dr"],[423,11,"14 Spruce Dr"],[424,11,"43 Spruce Dr"],[425,11,"41 Spruce Dr"],[426,11,"37 Spruce Dr"],[427,11,"35 Spruce Dr"],[428,11,"10 Spruce Dr"],[429,11,"31 Spruce Dr"],[430,11,"25 Pine Rd"],[431,11,"23 Pine Rd"],[432,11,"21 Pine Rd"],[433,11,"19 Pine Rd"],[434,11,"17 Pine Rd"],[435,11,"15 Pine Rd"],[436,11,"13 Pine Rd"],[437,11,"11 Pine Rd"],[438,11,"9 Pine Rd"],[439,11,"7 Pine Rd"],[440,11,"6 Pine Rd"],[441,11,"4 Pine Rd"],[442,11,"3 Pine Rd"],[443,11,"1 Pine Rd"],[444,11,"2 Pine Rd"],[445,11,"5 Centennial Ave"],[446,11,"287 Hopewell Rd"],[447,11,"285 Hopewell Rd"],[448,11,"283 Hopewell Rd"],[449,12,"281 Hopewell Rd"],[450,12,"279 Hopewell Rd"],[451,12,"277 Hopewell Rd"],[452,12,"273 Hopewell Rd"],[453,12,"271 Hopewell Rd"],[454,12,"269 Hopewell Rd"],[455,12,"267 Hopewell Rd"],[456,12,"265 Hopewell Rd"],[457,12,"263 Hopewell Rd"],[458,12,"2 Paoli Ave"],[459,12,"6 Paoli Ave"],[460,12,"14 W Lake Rd"],[461,12,"16 W Lake Rd"],[462,12,"22 W Lake Rd"],[463,12,"30 W Lake Rd"],[464,12,"32 W Lake Rd"],[465,12,"36 W Lake Rd"],[466,12,"42 W Lake Rd"],[467,12,"44 W Lake Rd"],[468,12,"48 W Lake Rd"],[469,12,"58 W Lake Rd"],[470,12,"53 W Lake Rd"],[471,12,"31 W Lake Rd"],[472,12,"27 W Lake Rd"],[473,12,"23 W Lake Rd"],[474,12,"19 W Lake Rd"],[475,12,"17 W Lake Rd"],[476,12,"15 W Lake Rd"],[477,12,"9 W Lake Rd"],[478,12,"5 Paoli Ave"],[479,12,"3 Paoli Ave"],[480,12,"1 Paoli Ave"],[481,12,"5 Devon Ave"],[482,12,"3 Devon Ave"],[483,12,"4 Devon Ave"],[484,12,"253 Hopewell Rd"],[485,12,"1 Breakneck Rd"]]; // [seq, loc, address] in case order
+const CASES = 3, ROWS = 4;
+const items = DATA.map(([seq, loc, addr]) => {
+  const m = addr.match(/^(\S+)\s+(.*?)(?:\s+((?:Ste|Apt)\s+\S+))?$/);
+  return { seq, loc, addr, num: m[1], street: m[2], unit: m[3] || "" };
+});
+const byLoc = {};
+items.forEach(it => (byLoc[it.loc] = byLoc[it.loc] || []).push(it));
+const LOCS = Object.keys(byLoc).map(Number).sort((a, b) => a - b);
+
+const KEY = "case-drill-v1";
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
+const store = Object.assign({ box: {}, best: 0, labels: true, order: "smart", map: "across", view: "stand", locs: [], auto: false }, load());
+const S = { cur: null, answered: false, n: 0, ok: 0, streak: 0, recent: [], routeIdx: 0, timer: 0 };
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+
+function locToCR(loc) {
+  const i = loc - 1;
+  return store.map === "down" ? { c: Math.floor(i / ROWS) + 1, r: (i % ROWS) + 1 } : { c: (i % CASES) + 1, r: Math.floor(i / CASES) + 1 };
+}
+function crToLoc(c, r) { return store.map === "down" ? (c - 1) * ROWS + r : (r - 1) * CASES + c; }
+
+const board = $("board");
+function buildBoard() {
+  board.innerHTML = "";
+  for (let c = 1; c <= CASES; c++) {
+    const col = document.createElement("div");
+    col.className = "case"; col.dataset.c = c;
+    col.innerHTML = `<div class="case-head">Case ${c}</div>`;
+    for (let r = 1; r <= ROWS; r++) {
+      const loc = crToLoc(c, r), list = byLoc[loc];
+      const b = document.createElement("button");
+      b.className = "tile"; b.dataset.c = c; b.dataset.r = r; b.dataset.loc = loc;
+      b.setAttribute("aria-label", `Case ${c}, row ${r}`);
+      b.innerHTML = `<div class="holes"></div><div class="strip"><div class="rn">Row ${r}<span>L${loc}</span></div><div class="pa">${esc(list[0].addr)}</div></div><div class="bar"><i></i></div>`;
+      b.addEventListener("click", () => answer(c, r));
+      col.appendChild(b);
+    }
+    board.appendChild(col);
+  }
+  board.classList.toggle("hide-labels", !store.labels);
+  board.classList.toggle("stand", store.view !== "flat");
+  paintBars();
+}
+function paintBars() {
+  document.querySelectorAll(".tile").forEach(b => {
+    const list = byLoc[b.dataset.loc];
+    const known = list.filter(it => (store.box[it.seq] || 0) >= 3).length;
+    b.querySelector(".bar i").style.width = (100 * known / list.length) + "%";
+  });
+}
+function look(c) {
+  document.querySelectorAll(".case").forEach(el => {
+    const n = +el.dataset.c;
+    el.classList.toggle("look", n === c && n !== 2);
+    el.classList.toggle("away", n === 2 && (c === 1 || c === 3));
+  });
+}
+
+function pool() { const sel = store.locs.length ? store.locs : LOCS; return items.filter(it => sel.includes(it.loc)); }
+const WEIGHT = [8, 5, 3, 1, 0.6, 0.4];
+function pick() {
+  const p = pool();
+  if (store.order === "route") { S.routeIdx %= p.length; return p[S.routeIdx++]; }
+  const avoid = new Set(S.recent);
+  const cand = p.length > 8 ? p.filter(it => !avoid.has(it.seq)) : p;
+  let tot = 0;
+  const w = cand.map(it => (tot += WEIGHT[Math.min(store.box[it.seq] || 0, 5)]));
+  const x = Math.random() * tot;
+  return cand[w.findIndex(v => v >= x)] || cand[0];
+}
+
+function ask() {
+  clearTimeout(S.timer);
+  S.cur = pick(); S.answered = false; look(0);
+  S.recent.push(S.cur.seq); if (S.recent.length > 6) S.recent.shift();
+  $("addr").innerHTML = `<span class="num">${esc(S.cur.num)}</span><span class="street">${esc(S.cur.street)}</span>` + (S.cur.unit ? `<span class="unit">${esc(S.cur.unit)}</span>` : "");
+  const bx = store.box[S.cur.seq] || 0;
+  $("eyebrow").textContent = bx ? `Where does this go? · right ${bx} in a row` : "Where does this go?";
+  $("fbLine").innerHTML = `<span class="hint">Tap the case row this address belongs in.</span>`;
+  $("fbZoom").innerHTML = `<div class="rz-empty">After you tap, the row and the exact cell show here.</div>`;
+  $("nextBtn").disabled = true;
+  document.querySelectorAll(".tile").forEach(b => {
+    b.classList.remove("is-ok", "is-bad", "is-answer");
+    const h = b.querySelector(".holes"); h.className = "holes"; h.innerHTML = "";
+  });
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+}
+
+function runsOf(list) {
+  const out = [];
+  list.forEach(it => { const l = out[out.length - 1]; if (l && l.street === it.street) l.items.push(it); else out.push({ street: it.street, items: [it] }); });
+  return out;
+}
+function rowZoom(list, it) {
+  const n = list.length, pos = list.indexOf(it);
+  const caret = list.map((x, i) => `<div class="rz-caret">${i === pos ? "▼" : ""}</div>`).join("");
+  const cells = list.map((x, i) => `<div class="rz-cell${i === pos ? " hit" : ""}"><small>${i + 1}</small>${esc(x.num)}` +
+    (x.unit ? `<span class="u">${esc(x.unit.replace(/^(Ste|Apt)\s+/, (m, a) => a[0]))}</span>` : "") + `</div>`).join("");
+  let streets = "", start = 0, alt = 0;
+  runsOf(list).forEach(r => {
+    const span = r.items.length;
+    streets += `<div class="rz-street ${alt++ % 2 ? "b" : "a"}${r.items.includes(it) ? " hit" : ""}${start === 0 ? " first" : ""}" style="grid-column:${start + 1} / span ${span}">${esc(r.street)}</div>`;
+    start += span;
+  });
+  const third = pos < n / 3 ? "left third" : pos < (2 * n) / 3 ? "middle third" : "right third";
+  return `<div class="rowzoom"><div class="rz-head"><span><b>Cell ${pos + 1} of ${n}</b> · ${pos} before, ${n - pos - 1} after</span><span>${third}</span></div>
+    <div class="rz-scroll" id="rzScroll"><div class="rz-grid" style="grid-template-columns: repeat(${n}, 32px)">${caret}${cells}${streets}</div></div></div>`;
+}
+
+function answer(c, r) {
+  if (S.answered) return;
+  S.answered = true;
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  const it = S.cur, want = locToCR(it.loc), right = want.c === c && want.r === r;
+  S.n++;
+  if (right) { S.ok++; S.streak++; store.box[it.seq] = Math.min((store.box[it.seq] || 0) + 1, 5); }
+  else { S.streak = 0; store.box[it.seq] = 0; }
+  store.best = Math.max(store.best, S.streak); save();
+  const picked = document.querySelector(`.tile[data-c="${c}"][data-r="${r}"]`);
+  const target = document.querySelector(`.tile[data-c="${want.c}"][data-r="${want.r}"]`);
+  if (right) picked.classList.add("is-ok"); else { picked.classList.add("is-bad"); target.classList.add("is-answer"); }
+  const list = byLoc[it.loc], pos = list.indexOf(it);
+  const th = target.querySelector(".holes"); th.className = "holes cells";
+  th.innerHTML = list.map(x => `<i${x === it ? ' class="hit"' : ""}></i>`).join("");
+  const prev = items[it.seq - 2], next = items[it.seq];
+  $("fbLine").innerHTML = `<span class="verdict ${right ? "ok" : "bad"}">${right ? "Right" : "No"}</span>` +
+    `<span class="ctx"><b>Case ${want.c} · Row ${want.r}</b> · Loc ${it.loc} <span class="mono">seq ${it.seq}</span><br>` +
+    `<span class="mono">after</span> ${prev ? esc(prev.addr) : "start"} · <span class="mono">before</span> ${next ? esc(next.addr) : "end"}</span>`;
+  $("fbZoom").innerHTML = rowZoom(list, it);
+  const sc = $("rzScroll"), hit = sc.querySelector(".rz-cell.hit");
+  if (hit) sc.scrollLeft = Math.max(0, hit.offsetLeft - sc.clientWidth / 2 + hit.offsetWidth / 2);
+  look(want.c);
+  $("nextBtn").disabled = false;
+  stats(); paintBars();
+  if (right && store.auto) S.timer = setTimeout(() => { if (S.answered && S.cur === it) ask(); }, 1400);
+}
+function stats() {
+  $("sCorrect").textContent = `${S.ok}/${S.n}`;
+  $("sStreak").textContent = S.streak;
+  $("sBest").textContent = store.best;
+  $("sKnown").textContent = items.filter(it => (store.box[it.seq] || 0) >= 3).length;
+}
+$("nextBtn").addEventListener("click", ask);
+const auto = $("autoNext"); auto.checked = !!store.auto;
+auto.addEventListener("change", () => { store.auto = auto.checked; save(); });
+
+function seg(onId, offId, isOn, set) {
+  const a = $(onId), b = $(offId);
+  const paint = () => { a.setAttribute("aria-pressed", isOn()); b.setAttribute("aria-pressed", !isOn()); };
+  a.addEventListener("click", () => { set(true); paint(); save(); });
+  b.addEventListener("click", () => { set(false); paint(); save(); });
+  paint();
+}
+seg("lblOn", "lblOff", () => store.labels, v => { store.labels = v; board.classList.toggle("hide-labels", !v); });
+seg("ordSmart", "ordRoute", () => store.order === "smart", v => { store.order = v ? "smart" : "route"; S.routeIdx = 0; ask(); });
+seg("viewStand", "viewFlat", () => store.view !== "flat", v => { store.view = v ? "stand" : "flat"; board.classList.toggle("stand", v); });
+seg("mapAcross", "mapDown", () => store.map !== "down", v => { store.map = v ? "across" : "down"; buildBoard(); buildStudy(); ask(); });
+
+function buildChips() {
+  const el = $("chips"); el.innerHTML = "";
+  const all = document.createElement("button");
+  all.className = "chip"; all.textContent = "All 12";
+  all.addEventListener("click", () => { store.locs = []; save(); paintChips(); S.routeIdx = 0; ask(); });
+  el.appendChild(all);
+  LOCS.forEach(L => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.textContent = "L" + L; b.dataset.l = L;
+    b.addEventListener("click", () => {
+      store.locs = store.locs.includes(L) ? store.locs.filter(x => x !== L) : [...store.locs, L];
+      save(); paintChips(); S.routeIdx = 0; ask();
+    });
+    el.appendChild(b);
+  });
+  paintChips();
+}
+function paintChips() {
+  [...$("chips").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.l ? store.locs.includes(+b.dataset.l) : store.locs.length === 0));
+}
+function resetLink() {
+  const w = $("resetWrap");
+  w.innerHTML = `<button class="link" id="resetBtn">Reset progress</button>`;
+  $("resetBtn").addEventListener("click", () => {
+    w.innerHTML = `<span class="confirm">Clear all saved progress? <button class="danger" id="yes">Clear</button><button class="link" id="no">Keep</button></span>`;
+    $("yes").addEventListener("click", () => { store.box = {}; store.best = 0; save(); S.n = S.ok = S.streak = 0; stats(); paintBars(); resetLink(); ask(); });
+    $("no").addEventListener("click", resetLink);
+  });
+}
+function buildStudy() {
+  const body = $("study");
+  body.innerHTML = `<p class="small">Each row in order, as runs of the same street with first → last number and count.</p>`;
+  LOCS.forEach(L => {
+    const list = byLoc[L], cr = locToCR(L);
+    const runs = runsOf(list).map(r => {
+      const a = r.items[0].num, z = r.items[r.items.length - 1].num;
+      return `<span class="run">${esc(r.street)} <span>${a === z ? a : a + "→" + z} · ${r.items.length}</span></span>`;
+    }).join("");
+    const d = document.createElement("div"); d.className = "srow";
+    d.innerHTML = `<h3>Case ${cr.c} · Row ${cr.r}<small>Loc ${L} · ${list.length} cells</small></h3><div class="runs">${runs}</div>`;
+    body.appendChild(d);
+  });
+}
+
+buildBoard(); buildChips(); resetLink(); buildStudy(); stats(); ask();
+</script>
+
+</body>
+</html>
